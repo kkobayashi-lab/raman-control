@@ -23,12 +23,15 @@ class AndorSpectraCollector(SpectraCollector):
 
     def __init__(self, laser_controller: DaqController = None, coord_transformer: CoordTransformer = None,):
         super().__init__(laser_controller, coord_transformer)
-        self._sdk = atmcd()
-        self._sdk.Initialize("")
-        self._exposure = 1000
-        self.set_temp(-70)
         self._spc = ATSpectrograph()
         self._spc.Initialize("")
+        print('Loaded spectrograph')
+        self._sdk = atmcd()
+        self._sdk.Initialize("")
+        print('Loaded atmcd')
+        self._exposure = 1000
+        self.set_temp(-70)
+
 
     def set_temp(self, temp: float, block=False):
         ret = self._sdk.SetTemperature(temp)

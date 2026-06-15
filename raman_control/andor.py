@@ -84,6 +84,84 @@ class AndorSpectraCollector(SpectraCollector):
         ret = self._spc.SetWavelength(port, wavelength)
         print("SetWavelength returned {} target wavelength {} nm".format(ret, wavelength))
 
+
+    def get_number_gratings(self, port: int = 0) -> int:
+        """
+        Get the number of gratings available on the turret.
+
+        Parameters
+        ----------
+        port : int, default 0
+            Spectrograph device index
+
+        Returns
+        -------
+        int
+            Number of gratings installed
+        """
+        ret, num_gratings = self._spc.GetNumberGratings(port)
+        print("GetNumberGratings returned {} num gratings {}".format(ret, num_gratings))
+        return num_gratings
+
+    def get_grating(self, port: int = 0) -> int:
+        """
+        Get the currently selected grating.
+
+        Parameters
+        ----------
+        port : int, default 0
+            Spectrograph device index
+
+        Returns
+        -------
+        int
+            Current grating number (1-indexed)
+        """
+        ret, grating = self._spc.GetGrating(port)
+        return grating
+
+    def set_grating(self, grating: int, port: int = 0):
+        """
+        Set the active grating on the turret.
+
+        Parameters
+        ----------
+        grating : int
+            Target grating number (1-indexed, must be <= number of gratings)
+        port : int, default 0
+            Spectrograph device index
+        """
+        ret = self._spc.SetGrating(port, grating)
+        print("SetGrating returned {} target grating {}".format(ret, grating))
+        return ret
+
+    def get_grating_info(self, grating: int, port: int = 0, max_blaze_len: int = 64):
+        """
+        Get information about a specific grating.
+
+        Parameters
+        ----------
+        grating : int
+            Grating number to query (1-indexed)
+        port : int, default 0
+            Spectrograph device index
+        max_blaze_len : int, default 64
+            Buffer length for the blaze string
+
+        Returns
+        -------
+        tuple
+            (lines_per_mm, blaze, home, offset)
+        """
+        ret, lines, blaze, home, offset = self._spc.GetGratingInfo(port, grating, max_blaze_len)
+        print("GetGratingInfo returned {}".format(ret))
+        print("\tGrating no {}".format(grating))
+        print("\tLines/mm: {}".format(lines))
+        print("\tBlaze: {}".format(blaze))
+        print("\tHome: {}".format(home))
+        print("\tOffset: {}".format(offset))
+        return lines, blaze, home, offset
+
     def set_rm_exposure(self, exposure: float):
         self._sdk.SetExposureTime(exposure/1000)
         self._exposure = exposure

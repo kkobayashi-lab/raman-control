@@ -241,6 +241,18 @@ class SpectraCollector:
         self._daq_controller.galvo.stop()
         return self._convert_capture(dataset)
 
+    def collect_spectra_pts(self, volts, exposure=20):
+        """Collect one LightField frame per requested galvo point."""
+        return self.collect_spectra_volts(volts, exposure)
+
+    def collect_spectra_pts_batch(self, volts, exposure=20):
+        """Compatibility fallback for callers requesting batched collection.
+
+        LightField performs the multi-frame capture synchronously, so the same
+        acquisition path is used for both regular and batch requests.
+        """
+        return self.collect_spectra_volts(volts, exposure)
+
     def capture_rm_grid(
         self,
         N: int = 75,

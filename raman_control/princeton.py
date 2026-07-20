@@ -39,7 +39,7 @@ from PrincetonInstruments.LightField.Automation import *  # noqa
 
 
 class SpectraCollector:
-    MAX_VOLTS: float = 0.6
+    MAX_VOLTS: float = 10
     _instance = None
 
     @classmethod
@@ -162,6 +162,18 @@ class SpectraCollector:
 
         self._auto = auto
         self._experiment = experiment
+        self._set_full_vertical_binning()
+
+    def _set_full_vertical_binning(self):
+        """Combine every sensor row into one spectrum at runtime.
+
+        ``SetLineSensorRegion`` changes only the currently loaded experiment.  The
+        LightField experiment file is not modified unless it is explicitly saved.
+        """
+        sensor_height = int(self._experiment.FullSensorRegion.Height)
+        if sensor_height < 1:
+            raise RuntimeError("LightField reported an invalid sensor height")
+        self._experiment.SetLineSensorRegion(sensor_height)
 
     def _set_value(self, setting, value):
         # Check for existence before setting
@@ -236,8 +248,10 @@ class SpectraCollector:
         points = np.ascontiguousarray(points.T)
         self._daq_controller.prepare_for_collection(points)
         self._experiment.Stop()
-        with self._daq_controller.open_shutter:
-            dataset = self._experiment.Capture(points.shape[1])
+        # Reapply the runtime-only ROI in case it was changed in the LightField UI.
+        self._set_full_vertical_binning()
+        # with self._daq_controller.open_shutter:
+        dataset = self._experiment.Capture(points.shape[1])
         self._daq_controller.galvo.stop()
         return self._convert_capture(dataset)
 

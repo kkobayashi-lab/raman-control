@@ -39,9 +39,9 @@ class DaqController:
     @classmethod
     def instance(
         cls,
-        sampleClockSource: str = "/Dev2/PFI0",
+        sampleClockSource: str = "/Dev1/PFI0",
         devName: str = "Dev1",
-        channels: list[str] = ["Dev2/ao0", "Dev2/ao1"],
+        channels: list[str] = ["Dev1/ao0", "Dev1/ao1"],
     ) -> DaqController:
         if cls._instance is None:
             cls._instance = cls(sampleClockSource, devName, channels)
@@ -49,9 +49,9 @@ class DaqController:
 
     def __init__(
         self,
-        sampleClockSource="/Dev2/PFI0",
-        devName="Dev2",
-        channels=["Dev2/ao0", "Dev2/ao1"],
+        sampleClockSource="/Dev1/PFI0",
+        devName="Dev1",
+        channels=["Dev1/ao0", "Dev1/ao1"],
     ) -> None:
         # galvo mirror
         self._galvo = nidaqmx.Task("galvoAO")
@@ -70,7 +70,7 @@ class DaqController:
 
         # # focus filter actuator
         # self._filter = nidaqmx.Task("filterDO")
-        # self._filter.do_channels.add_do_chan("Dev1/port2/line4")
+        # self._filter.do_channels.add_do_chan("Dev1/port0/line1")
         # self._remove_filter = DigitalStateContextManager(self._filter, True)
         # self._insert_filter = DigitalStateContextManager(self._filter, False)
 
@@ -119,7 +119,7 @@ class DaqController:
         # xy_grid, volts = make_grid(N)
         if not batch:
             SAMPLERATE = 100000
-            SAMPLECLOCKSOURCE = "/Dev2/PFI0"
+            SAMPLECLOCKSOURCE = "/Dev1/PFI0"
             self._galvo.timing.cfg_samp_clk_timing(
                 SAMPLERATE,
                 source=SAMPLECLOCKSOURCE,

@@ -38,7 +38,7 @@ from .utils import make_grid
 
 
 class SpectraCollector:
-    MAX_VOLTS: float = 0.6
+    MAX_VOLTS: float = 10
     _instance = None
 
     @classmethod

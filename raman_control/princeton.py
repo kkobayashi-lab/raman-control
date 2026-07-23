@@ -23,6 +23,7 @@ from System.Runtime.InteropServices import GCHandle, GCHandleType  # noqa
 
 from .calibration import CoordTransformer
 from .daq import DaqController
+from .spectral_axis import wavelengths_to_raman_shift
 from .utils import make_grid
 # Add needed dll references
 sys.path.append(os.environ["LIGHTFIELD_ROOT"])
@@ -193,6 +194,47 @@ class SpectraCollector:
         self._set_value(
             CameraSettings.ShutterTimingExposureTime, float(exposure)  # noqa: F405
         )
+
+    def get_wavelengths(self) -> np.ndarray:
+        """Return LightField's calibrated wavelength for every detector column."""
+        wavelengths = np.asarray(
+            self._experiment.SystemColumnCalibration, dtype=float
+        )
+        if wavelengths.ndim != 1 or wavelengths.size == 0:
+            raise RuntimeError(
+                "LightField did not provide a wavelength calibration"
+            )
+        return wavelengths
+
+    def get_laser_wavelength(self) -> float:
+        """Return LightField's laser line used for relative wavenumbers."""
+        setting = (
+            ExperimentSettings  # noqa: F405
+            .OnlineExportCsvFormatOptionsUnitsWavelengthLaserLine
+        )
+        if not self._experiment.Exists(setting):
+            raise RuntimeError(
+                "Configure a Relative Wavenumbers laser line in LightField"
+            )
+        wavelength = float(self._experiment.GetValue(setting))
+        if not np.isfinite(wavelength) or wavelength <= 0:
+            raise RuntimeError(
+                "LightField's Relative Wavenumbers laser line is invalid"
+            )
+        return wavelength
+
+    def get_wavenumbers(self, expected_length: int | None = None) -> np.ndarray:
+        """Return the LightField-calibrated Raman shift axis in cm^-1."""
+        wavenumbers = wavelengths_to_raman_shift(
+            self.get_wavelengths(), self.get_laser_wavelength()
+        )
+        if expected_length is not None and len(wavenumbers) != expected_length:
+            raise RuntimeError(
+                "LightField calibration length "
+                f"({len(wavenumbers)}) does not match spectrum length "
+                f"({expected_length})"
+            )
+        return wavenumbers
 
     def collect_spectra_relative(self, points, exposure=20):
         """

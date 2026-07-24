@@ -43,7 +43,12 @@ class DaqController:
         devName: str = "Dev1",
         channels: list[str] = ["Dev1/ao0", "Dev1/ao1"],
     ) -> DaqController:
-        if cls._instance is None:
+        if (
+            cls._instance is None
+            or cls._instance._task_is_closed(cls._instance._galvo)
+        ):
+            if cls._instance is not None:
+                cls._instance.close()
             cls._instance = cls(sampleClockSource, devName, channels)
         return cls._instance
 
@@ -53,14 +58,12 @@ class DaqController:
         devName="Dev1",
         channels=["Dev1/ao0", "Dev1/ao1"],
     ) -> None:
+        self._sample_clock_source = sampleClockSource
+        self._dev_name = devName
+        self._channels = tuple(channels)
+
         # galvo mirror
-        self._galvo = nidaqmx.Task("galvoAO")
-        self._galvo.ao_channels.add_ao_voltage_chan(
-            channels[0], "x", min_val=-10, max_val=10
-        )
-        self._galvo.ao_channels.add_ao_voltage_chan(
-            channels[1], "y", min_val=-10, max_val=10
-        )
+        self._galvo = self._create_galvo_task()
 
         # laser shutter
         # self._shutter = nidaqmx.Task("shutterDO")
@@ -73,6 +76,48 @@ class DaqController:
         self._filter.do_channels.add_do_chan("Dev1/port0/line1")
         self._remove_filter = DigitalStateContextManager(self._filter, False)
         self._insert_filter = DigitalStateContextManager(self._filter, True)
+
+    @staticmethod
+    def _task_is_closed(task) -> bool:
+        return task is None or getattr(task, "_handle", None) is None
+
+    def _create_galvo_task(self):
+        galvo = nidaqmx.Task("galvoAO")
+        galvo.ao_channels.add_ao_voltage_chan(
+            self._channels[0], "x", min_val=-10, max_val=10
+        )
+        galvo.ao_channels.add_ao_voltage_chan(
+            self._channels[1], "y", min_val=-10, max_val=10
+        )
+        return galvo
+
+    @staticmethod
+    def _close_task(task):
+        if DaqController._task_is_closed(task):
+            return
+        try:
+            task.stop()
+        except nidaqmx.errors.DaqError:
+            pass
+        try:
+            task.close()
+        except nidaqmx.errors.DaqError:
+            pass
+
+    def _replace_galvo_task(self):
+        self._close_task(self._galvo)
+        self._galvo = self._create_galvo_task()
+
+    def _stop_galvo_for_reconfiguration(self):
+        if self._task_is_closed(self._galvo):
+            self._replace_galvo_task()
+            return
+        try:
+            self._galvo.stop()
+        except nidaqmx.errors.DaqError as error:
+            if error.error_code != -200088:
+                raise
+            self._replace_galvo_task()
 
     @property
     def remove_filter(self) -> DigitalStateContextManager:
@@ -100,10 +145,12 @@ class DaqController:
         """
         # self._shutter.stop()
         # self._shutter.close()
-        self._galvo.stop()
-        self._galvo.close()
-        # self._filter.stop()
-        # self._filter.close()
+        self._close_task(self._galvo)
+        self._close_task(self._filter)
+        self._galvo = None
+        self._filter = None
+        if type(self)._instance is self:
+            type(self)._instance = None
 
     def prepare_for_collection(self, points: np.ndarray, batch=False, exposure=None):
         """
@@ -115,14 +162,13 @@ class DaqController:
             In volts.
         """
         points = np.ascontiguousarray(points)
-        self._galvo.stop()
+        self._stop_galvo_for_reconfiguration()
         # xy_grid, volts = make_grid(N)
         if not batch:
             SAMPLERATE = 100000
-            SAMPLECLOCKSOURCE = "/Dev1/PFI0"
             self._galvo.timing.cfg_samp_clk_timing(
                 SAMPLERATE,
-                source=SAMPLECLOCKSOURCE,
+                source=self._sample_clock_source,
                 active_edge=nidaqmx.constants.Edge.RISING,
                 sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
                 samps_per_chan=points.shape[1],
@@ -135,7 +181,9 @@ class DaqController:
                 sample_mode=nidaqmx.constants.AcquisitionType.FINITE,
                 samps_per_chan=points.shape[1],
             )
-            self._galvo.triggers.start_trigger.cfg_dig_edge_start_trig("PFI0")
+            self._galvo.triggers.start_trigger.cfg_dig_edge_start_trig(
+                self._sample_clock_source
+            )
             self._galvo.write(points)
             self._galvo.start()
 

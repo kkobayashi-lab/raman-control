@@ -97,3 +97,22 @@ def test_prepare_recreates_task_after_invalid_task_error(monkeypatch):
     assert tasks[0].closed
     assert tasks[2].written[1] is True
     assert tasks[2].timing.config[1]["source"] == "/Dev1/PFI0"
+
+
+def test_set_galvo_position_replaces_timed_task_with_on_demand_task(
+    monkeypatch,
+):
+    tasks = _fake_tasks(monkeypatch)
+    controller = daq.DaqController.instance()
+    original = controller.galvo
+    controller.prepare_for_collection(np.zeros((2, 2)))
+
+    controller.set_galvo_position(np.array([0.25, -0.5]))
+
+    assert original.closed
+    assert controller.galvo is tasks[2]
+    assert tasks[2].timing.config is None
+    np.testing.assert_array_equal(
+        tasks[2].written[0], np.array([0.25, -0.5])
+    )
+    assert tasks[2].written[1] is True

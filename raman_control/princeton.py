@@ -11,7 +11,7 @@ import time
 # Import the .NET class library
 import clr
 
-# numpy import
+# numpy impor︃t
 import numpy as np
 
 # fmt: off
@@ -283,18 +283,27 @@ class SpectraCollector:
                 "Voltages out of "
                 f"the safe range: [{-self.MAX_VOLTS:0.2f}, {self.MAX_VOLTS:0.2f}]"
             )
+        # st = time.perf_counter()
         self.set_rm_exposure(exposure)
-
+        # print(f"setting exposure time in LF took {time.perf_counter() - st} s")
+        # st = time.perf_counter()
         # transpose to put into shape (2, N)
         # and make contiguous after bc transpose would undo that
         points = np.ascontiguousarray(points.T)
         self._daq_controller.prepare_for_collection(points)
         self._experiment.Stop()
+        # print(f"preparing for collection took {time.perf_counter() - st}s")
+        # st = time.perf_counter()
         # Reapply the runtime-only ROI in case it was changed in the LightField UI.
         self._set_full_vertical_binning()
+        # print(f"setting the vertical binning took {time.perf_counter() - st} s")
+        # st = time.perf_counter()
         # with self._daq_controller.open_shutter:
         dataset = self._experiment.Capture(points.shape[1])
+        # print(f"Capturing took {time.perf_counter() - st} s")
+        # st = time.perf_counter()
         self._daq_controller.galvo.stop()
+        # print(f"Stopping the galvo took {time.perf_counter() - st} s")
         return self._convert_capture(dataset)
 
     def collect_spectra_pts(self, volts, exposure=20):

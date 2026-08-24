@@ -119,6 +119,27 @@ class DaqController:
                 raise
             self._replace_galvo_task()
 
+    def set_galvo_position(self, volts: np.ndarray) -> None:
+        """Hold the galvos at one X/Y voltage using on-demand output.
+
+        Collection configures the task for a finite external sample clock.
+        Recreate it here so a manual point command is emitted immediately
+        instead of waiting for another camera trigger.
+        """
+        volts = np.asarray(volts, dtype=float)
+        if volts.shape != (2,):
+            raise ValueError(
+                f"galvo position must have shape (2,), got {volts.shape}"
+            )
+        if not np.all(np.isfinite(volts)):
+            raise ValueError("galvo position must contain finite voltages")
+
+        self._replace_galvo_task()
+        self._galvo.write(
+            np.ascontiguousarray(volts),
+            auto_start=True,
+        )
+
     @property
     def remove_filter(self) -> DigitalStateContextManager:
         return self._remove_filter
